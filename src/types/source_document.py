@@ -11,3 +11,7 @@ from .source import Source
 class SourceDocument:
     document: Final[Document]
     source: Final[Source]
+
+    @property
+    def id(self) -> int:
+        return hash(self.document.page_content)

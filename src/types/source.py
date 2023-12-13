@@ -1,7 +1,5 @@
 from dataclasses import dataclass
 from datetime import datetime
-
-# from hashlib import _Hash
 from typing import Final, final
 
 from .team import Team
@@ -17,6 +15,6 @@ class Source:
     url: Final[str]
     file_type: Final[str]
 
-    # @property
-    # def id(self) -> _Hash:
-    #     return _Hash(self.url, self.last_updated)
+    @property
+    def id(self) -> int:
+        return hash(self.url + str(self.last_updated))
