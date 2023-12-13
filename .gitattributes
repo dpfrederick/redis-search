@@ -1,0 +1,4 @@
+* text=auto eol=lf
+
+*.py linguist-language=python
+*.ipynb text

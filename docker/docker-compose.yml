@@ -1,0 +1,8 @@
+services:
+  vectordb:
+    container_name: redis-search
+    image: harbor.clarkinc.biz/dockerhub/redis/redis-stack-server:7.2.0-v6
+    environment:
+      REDIS_ARGS: --requirepass ${REDIS_PASSWORD}
+    ports:
+      - 6379:6379
