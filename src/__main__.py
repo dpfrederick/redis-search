@@ -94,10 +94,14 @@ def store_source_documents_in_redis(
     for document in source_documents:
         # embedding = embeddings_model.embed_query(document.document.page_content)
         redis_key = f"{document.source.id}:{document.id}"
+        document_json = json.loads(document.json())
+        document_json["embedding"] = embeddings_model.embed_query(
+            document.document.page_content
+        )
         pipeline.json().set(
             redis_key,
             "$",
-            json.loads(document.json()),
+            document_json,
         )
     res = pipeline.execute()
 
