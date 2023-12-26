@@ -18,6 +18,7 @@ poethepoet = "^0.24.0"
 faker = "^19.9.0"
 redis = "^5.0.1"
 fakeredis = "^2.20.0"
+pydantic = "^2.5.3"
 
 
 [tool.poetry.group.dev.dependencies]

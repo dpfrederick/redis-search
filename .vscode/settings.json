@@ -21,5 +21,9 @@
         "editor.codeActionsOnSave": {
             "source.organizeImports": "explicit"
         }
-    }
+    },
+    "cSpell.words": [
+        "docstore",
+        "pydantic"
+    ]
 }

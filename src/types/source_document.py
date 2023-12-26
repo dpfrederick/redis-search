@@ -1,16 +1,12 @@
-from dataclasses import dataclass
-from typing import Final, final
-
 from langchain.docstore.document import Document
+from pydantic.v1 import BaseModel
 
 from .source import Source
 
 
-@dataclass
-@final
-class SourceDocument:
-    document: Final[Document]
-    source: Final[Source]
+class SourceDocument(BaseModel):
+    document: Document
+    source: Source
 
     @property
     def id(self) -> int:

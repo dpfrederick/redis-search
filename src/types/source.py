@@ -1,19 +1,17 @@
-from dataclasses import dataclass
 from datetime import datetime
-from typing import Final, final
+
+from pydantic.v1 import BaseModel
 
 from .team import Team
 
 
-@dataclass
-@final
-class Source:
-    team: Final[Team]
-    title: Final[str]
-    path: Final[str]
-    last_updated: Final[datetime]
-    url: Final[str]
-    file_type: Final[str]
+class Source(BaseModel):
+    team: Team
+    title: str
+    path: str
+    last_updated: datetime
+    url: str
+    file_type: str
 
     @property
     def id(self) -> int:

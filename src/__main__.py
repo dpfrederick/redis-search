@@ -1,3 +1,4 @@
+import json
 import os
 import struct
 from datetime import datetime
@@ -88,17 +89,17 @@ def initialize_redis_search_index(
 
 def store_source_documents_in_redis(
     source_documents: List[SourceDocument], redis_client: redis.Redis
-):
+) -> None:
+    pipeline = redis_client.pipeline()
     for document in source_documents:
-        embedding = embeddings_model.embed_query(document.document.page_content)
-        redis_client.set(
-            f"{document.source.id}:{document.id}:page_content",
-            document.document.page_content,
+        # embedding = embeddings_model.embed_query(document.document.page_content)
+        redis_key = f"{document.source.id}:{document.id}"
+        pipeline.json().set(
+            redis_key,
+            "$",
+            json.loads(document.json()),
         )
-        redis_client.set(
-            f"{document.source.id}:{document.id}:embedding",
-            embedding,
-        )
+    res = pipeline.execute()
 
 
 def main():
@@ -111,7 +112,7 @@ def main():
         password=os.environ.get("REDIS_PASSWORD"),
     )
     redis_client.flushdb()
-    initialize_redis_search_index(redis_client, "my_index", "embedding", 1536)
+    # initialize_redis_search_index(redis_client, "my_index", "embedding", 1536)
 
     sources: List[Source] = []
     source_documents: List[SourceDocument] = []
@@ -136,7 +137,12 @@ def main():
                 for doc in docs:
                     source_documents.append(doc)
 
-        store_source_documents_in_redis(source_documents, redis_client, "embedding")
+        store_source_documents_in_redis(source_documents, redis_client)
+
+        document = source_documents[0]
+        redis_key = f"{document.source.id}:{document.id}"
+        res = redis_client.json().get(redis_key, "$.document.page_content")
+        print(res)
 
 
 if __name__ == "__main__":
