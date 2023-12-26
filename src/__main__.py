@@ -1,14 +1,17 @@
 import json
 import os
-import struct
 from datetime import datetime
 from typing import List
 
+import numpy as np
 import redis
 from dotenv import load_dotenv
 from langchain.docstore.document import Document
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.text_splitter import MarkdownHeaderTextSplitter
+from redis.commands.search.field import VectorField
+from redis.commands.search.indexDefinition import IndexDefinition, IndexType
+from redis.commands.search.query import Query
 
 from .types import Source, SourceDocument, Team
 
@@ -30,61 +33,32 @@ def create_source_documents_from_markdown_file(
     return [SourceDocument(document=doc, source=source) for doc in documents]
 
 
-def initialize_redis_search_index(
-    redis_client: redis.Redis, index_name: str, vector_field: str, dim: int
-):
-    """
-    Initialize a RedisSearch index with a vector field.
-
-    :param redis_client: The Redis client connected to your Redis instance.
-    :param index_name: The name of the index to create.
-    :param vector_field: The name of the vector field for embeddings.
-    :param dim: The dimension of the vectors (embeddings).
-    """
-    try:
-        redis_client.execute_command(
-            "FT.CREATE",
-            index_name,
-            "ON",
-            "HASH",
-            "SCHEMA",
-            "page_content",
-            "TEXT",
-            vector_field,
-            "VECTOR",
+def initialize_redis_search_index(redis_client: redis.Redis, dim: int) -> None:
+    schema = [
+        VectorField(
+            "$.embedding",
             "FLAT",
-            "DIM",
-            dim,
-            "TYPE",
-            "FLOAT32",
-            "DISTANCE",
-            "COSINE",
-        )
-        print(f"Index '{index_name}' created successfully.")
-    except Exception as e:
-        print(f"Error creating index: {e}")
+            {
+                "TYPE": "FLOAT32",
+                "DIM": dim,
+                "DISTANCE_METRIC": "COSINE",
+            },
+            as_name="vector",
+        ),
+    ]
+
+    definition = IndexDefinition(prefix=["documents:"], index_type=IndexType.JSON)
+
+    res = redis_client.ft("idx:documents_vss").create_index(
+        fields=schema, definition=definition
+    )
 
 
-# def store_source_documents_in_redis(
-#     source_documents: List[SourceDocument],
-#     redis_client: redis.Redis,
-#     embedding_field: str,
-# ):
-#     for document in source_documents:
-#         # Generate the embedding
-#         embedding = embeddings_model.embed_query(document.document.page_content)
-
-#         # Convert the embedding to a binary format
-#         binary_embedding = struct.pack(f"{len(embedding)}f", *embedding)
-
-#         # Use HSET to store both the document content and its embedding
-#         redis_client.hset(
-#             f"{document.source.id}:{document.id}",
-#             mapping={
-#                 "page_content": document.document.page_content,
-#                 embedding_field: binary_embedding,
-#             },
-#         )
+def check_redis_search_index(redis_client: redis.Redis) -> None:
+    info = redis_client.ft("idx:documents_vss").info()
+    num_docs = info["num_docs"]
+    indexing_failures = info["hash_indexing_failures"]
+    print(f"{num_docs} documents indexed with {indexing_failures} failures.")
 
 
 def store_source_documents_in_redis(
@@ -92,8 +66,7 @@ def store_source_documents_in_redis(
 ) -> None:
     pipeline = redis_client.pipeline()
     for document in source_documents:
-        # embedding = embeddings_model.embed_query(document.document.page_content)
-        redis_key = f"{document.source.id}:{document.id}"
+        redis_key = f"documents:{document.source.id}:{document.id}"
         document_json = json.loads(document.json())
         document_json["embedding"] = embeddings_model.embed_query(
             document.document.page_content
@@ -116,7 +89,7 @@ def main():
         password=os.environ.get("REDIS_PASSWORD"),
     )
     redis_client.flushdb()
-    # initialize_redis_search_index(redis_client, "my_index", "embedding", 1536)
+    initialize_redis_search_index(redis_client, 1536)
 
     sources: List[Source] = []
     source_documents: List[SourceDocument] = []
@@ -143,10 +116,28 @@ def main():
 
         store_source_documents_in_redis(source_documents, redis_client)
 
-        document = source_documents[0]
-        redis_key = f"{document.source.id}:{document.id}"
-        res = redis_client.json().get(redis_key, "$.document.page_content")
-        print(res)
+        check_redis_search_index(redis_client)
+
+        input_text = "Redis is a key-value in-memory data structure store."
+        query_embedding = embeddings_model.embed_query(input_text)
+
+        query = (
+            Query("(*)=>[KNN 3 @vector $query_vector AS vector_score]")
+            .sort_by("vector_score")
+            .return_fields("vector_score", "document")
+            .dialect(2)
+        )
+
+        result_docs = (
+            redis_client.ft("idx:documents_vss")
+            .search(
+                query,
+                {"query_vector": np.array(query_embedding, dtype=np.float32).tobytes()},
+            )
+            .docs
+        )
+
+        print(result_docs)
 
 
 if __name__ == "__main__":
