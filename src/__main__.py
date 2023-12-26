@@ -64,41 +64,41 @@ def initialize_redis_search_index(
         print(f"Error creating index: {e}")
 
 
-def store_source_documents_in_redis(
-    source_documents: List[SourceDocument],
-    redis_client: redis.Redis,
-    embedding_field: str,
-):
-    for document in source_documents:
-        # Generate the embedding
-        embedding = embeddings_model.embed_query(document.document.page_content)
-
-        # Convert the embedding to a binary format
-        binary_embedding = struct.pack(f"{len(embedding)}f", *embedding)
-
-        # Use HSET to store both the document content and its embedding
-        redis_client.hset(
-            f"{document.source.id}:{document.id}",
-            mapping={
-                "page_content": document.document.page_content,
-                embedding_field: binary_embedding,
-            },
-        )
-
-
 # def store_source_documents_in_redis(
-#     source_documents: List[SourceDocument], redis_client: redis.Redis
+#     source_documents: List[SourceDocument],
+#     redis_client: redis.Redis,
+#     embedding_field: str,
 # ):
 #     for document in source_documents:
+#         # Generate the embedding
 #         embedding = embeddings_model.embed_query(document.document.page_content)
-#         redis_client.set(
-#             f"{document.source.id}:{document.id}:page_content",
-#             document.document.page_content,
+
+#         # Convert the embedding to a binary format
+#         binary_embedding = struct.pack(f"{len(embedding)}f", *embedding)
+
+#         # Use HSET to store both the document content and its embedding
+#         redis_client.hset(
+#             f"{document.source.id}:{document.id}",
+#             mapping={
+#                 "page_content": document.document.page_content,
+#                 embedding_field: binary_embedding,
+#             },
 #         )
-#         redis_client.set(
-#             f"{document.source.id}:{document.id}:embedding",
-#             embedding,
-#         )
+
+
+def store_source_documents_in_redis(
+    source_documents: List[SourceDocument], redis_client: redis.Redis
+):
+    for document in source_documents:
+        embedding = embeddings_model.embed_query(document.document.page_content)
+        redis_client.set(
+            f"{document.source.id}:{document.id}:page_content",
+            document.document.page_content,
+        )
+        redis_client.set(
+            f"{document.source.id}:{document.id}:embedding",
+            embedding,
+        )
 
 
 def main():
